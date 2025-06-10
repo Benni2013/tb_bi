@@ -4,4 +4,4 @@ sqlalchemy
 psycopg2
 nltk
 textblob
-streamlit-option-menu
+# streamlit-option-menu
