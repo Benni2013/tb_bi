@@ -35,7 +35,7 @@ DB_CONFIG = {
 }
 
 def create_engine_connection():
-    return create_engine(f"postgresql://{DB_CONFIG['user']}:{DB_CONFIG['password']}@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}")
+    return create_engine(f"postgresql://postgres.cwbeoriyhbsamwvhkuna:dw_dashboard_bi@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres")
 
 # Page configuration
 st.set_page_config(
