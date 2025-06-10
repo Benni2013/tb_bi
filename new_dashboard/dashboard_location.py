@@ -154,7 +154,7 @@ def render_location_dashboard():
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+            st.markdown('<hr style="border: 1px solid white; margin: 20px 0;">', unsafe_allow_html=True)
             st.subheader("📊 Performa Lokasi & Tren Rating")
             
             location_perf = filtered_data.groupby('city').agg({
@@ -180,7 +180,7 @@ def render_location_dashboard():
             st.markdown('</div>', unsafe_allow_html=True)
         
         with col2:
-            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+            st.markdown('<hr style="border: 1px solid white; margin: 20px 0;">', unsafe_allow_html=True)
             st.subheader("📈 Tren Rating Bulanan")
             
             monthly_trend = filtered_data.groupby(['year', 'month']).agg({
@@ -206,7 +206,7 @@ def render_location_dashboard():
             st.markdown('</div>', unsafe_allow_html=True)
     
         # Multi-line trend for top organizations
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        st.markdown('<hr style="border: 1px solid white; margin: 20px 0;">', unsafe_allow_html=True)
         st.subheader("📈 Tren Rating untuk Organisasi Teratas")
         
         # Get top organizations by review count
