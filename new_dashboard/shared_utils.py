@@ -18,16 +18,19 @@ except ImportError:
     WORDCLOUD_AVAILABLE = False
 
 # Database configuration
-DB_CONFIG = {
-    'host': 'localhost',
-    'database': 'dw_bi',
-    'user': 'postgres',
-    'password': 'postgres',
-    'port': '5432'
-}
+# DB_CONFIG = {
+#     'host': 'aws-0-ap-southeast-1.pooler.supabase.com',
+#     'database': 'postgres?pgbouncer=true',
+#     'user': 'postgres.cwbeoriyhbsamwvhkuna',
+#     'password': 'dw_bi',
+#     'port': '6543'
+# }
+
+# def create_engine_connection():
+#     return create_engine(f"postgresql://{DB_CONFIG['user']}:{DB_CONFIG['password']}@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}")
 
 def create_engine_connection():
-    return create_engine(f"postgresql://{DB_CONFIG['user']}:{DB_CONFIG['password']}@{DB_CONFIG['host']}:{DB_CONFIG['port']}/{DB_CONFIG['database']}")
+    return create_engine(f"postgresql://postgres.cwbeoriyhbsamwvhkuna:dw_dashboard_bi@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres")
 
 # Database connection
 @st.cache_resource
