@@ -272,18 +272,25 @@ def render_sentiment_dashboard():
                 if test_result.empty or test_result['total_count'].iloc[0] == 0:
                     return pd.DataFrame()
                 
-                # Load keywords data
+                # Load keywords data with joins to enable filtering
                 query = """
                 SELECT 
                     dk.keyword,
                     dk.keyword_category,
+                    dl.city,
+                    dr.organization_name,
+                    ds.sentiment_label,
                     COALESCE(COUNT(bsk.sentiment_key), 1) as frequency
                 FROM dim_keywords dk
                 LEFT JOIN bridge_sentiment_keywords bsk ON dk.keyword_key = bsk.keyword_key
+                LEFT JOIN dim_sentiment ds ON bsk.sentiment_key = ds.sentiment_key
+                LEFT JOIN fact_restaurant_reviews frr ON ds.sentiment_key = frr.sentiment_key
+                LEFT JOIN dim_restaurant dr ON frr.restaurant_key = dr.restaurant_key
+                LEFT JOIN dim_location dl ON frr.location_key = dl.location_key
                 WHERE dk.keyword IS NOT NULL AND dk.keyword != ''
-                GROUP BY dk.keyword, dk.keyword_category
+                GROUP BY dk.keyword, dk.keyword_category, dl.city, dr.organization_name, ds.sentiment_label
                 ORDER BY frequency DESC
-                LIMIT 50
+                LIMIT 1000
                 """
                 return load_data(query)
             except Exception as e:
@@ -318,6 +325,25 @@ def render_sentiment_dashboard():
             if selected_org != "Semua":
                 filtered_data = filtered_data[filtered_data['organization_name'] == selected_org]
             
+            # Filter keywords data based on selected filters
+            filtered_keywords_data = keywords_data.copy()
+            if not keywords_data.empty:
+                if selected_location != "Semua":
+                    filtered_keywords_data = filtered_keywords_data[
+                        (filtered_keywords_data['city'] == selected_location) | 
+                        (filtered_keywords_data['city'].isna())
+                    ]
+                if selected_org != "Semua":
+                    filtered_keywords_data = filtered_keywords_data[
+                        (filtered_keywords_data['organization_name'] == selected_org) | 
+                        (filtered_keywords_data['organization_name'].isna())
+                    ]
+                
+                # Re-aggregate keywords after filtering
+                filtered_keywords_data = filtered_keywords_data.groupby(['keyword', 'keyword_category']).agg({
+                    'frequency': 'sum'
+                }).reset_index().sort_values('frequency', ascending=False)
+
             # Sentiment metrics
             sentiment_counts = filtered_data['sentiment_label'].value_counts()
             total_reviews = len(filtered_data)
@@ -431,30 +457,62 @@ def render_sentiment_dashboard():
             st.markdown('<div class="chart-container">', unsafe_allow_html=True)
             st.subheader("☁️ Keyword Analysis")
             
-            if not keywords_data.empty:
+            if not filtered_keywords_data.empty:
+                # Show total keywords found
+                total_keywords = len(filtered_keywords_data)
+                total_mentions = filtered_keywords_data['frequency'].sum()
+                
+                col_info1, col_info2 = st.columns(2)
+                with col_info1:
+                    st.metric("Total Keywords", total_keywords)
+                with col_info2:
+                    st.metric("Total Mentions", total_mentions)
+                
+                # Filter keywords by sentiment if needed
+                sentiment_filter = st.selectbox(
+                    "Filter by Sentiment",
+                    ["Semua", "positive", "negative", "neutral"],
+                    key="keyword_sentiment_filter"
+                )
+                
+                display_keywords_data = filtered_keywords_data.copy()
+                if sentiment_filter != "Semua":
+                    # Re-filter original keywords data for sentiment
+                    sentiment_filtered = keywords_data[keywords_data['sentiment_label'] == sentiment_filter]
+                    if selected_location != "Semua":
+                        sentiment_filtered = sentiment_filtered[sentiment_filtered['city'] == selected_location]
+                    if selected_org != "Semua":
+                        sentiment_filtered = sentiment_filtered[sentiment_filtered['organization_name'] == selected_org]
+                    
+                    display_keywords_data = sentiment_filtered.groupby(['keyword', 'keyword_category']).agg({
+                        'frequency': 'sum'
+                    }).reset_index().sort_values('frequency', ascending=False)
+                
                 # Show keywords as list
                 st.subheader("🔤 Top Keywords")
-                col1, col2 = st.columns(2)
                 
-                with col1:
-                    for i, (_, row) in enumerate(keywords_data.head(15).iterrows(), 1):
-                        if pd.notna(row['keyword']) and row['keyword'] != '':
-                            category = row.get('keyword_category', 'general')
-                            st.markdown(f"{i}. **{row['keyword']}** ({category}) - {row['frequency']} mentions")
-                
-                with col2:
-                    remaining_keywords = keywords_data.iloc[15:30]
-                    for i, (_, row) in enumerate(remaining_keywords.iterrows(), 16):
-                        if pd.notna(row['keyword']) and row['keyword'] != '':
-                            category = row.get('keyword_category', 'general')
-                            st.markdown(f"{i}. **{row['keyword']}** ({category}) - {row['frequency']} mentions")
+                if not display_keywords_data.empty:
+                    col1, col2 = st.columns(2)
+                    
+                    with col1:
+                        for i, (_, row) in enumerate(display_keywords_data.head(15).iterrows(), 1):
+                            if pd.notna(row['keyword']) and row['keyword'] != '':
+                                category = row.get('keyword_category', 'general')
+                                st.markdown(f"{i}. **{row['keyword']}** ({category}) - {row['frequency']} mentions")
+                    
+                    with col2:
+                        remaining_keywords = display_keywords_data.iloc[15:30]
+                        for i, (_, row) in enumerate(remaining_keywords.iterrows(), 16):
+                            if pd.notna(row['keyword']) and row['keyword'] != '':
+                                category = row.get('keyword_category', 'general')
+                                st.markdown(f"{i}. **{row['keyword']}** ({category}) - {row['frequency']} mentions")
                 
                 # Try to create word cloud if available
                 if WORDCLOUD_AVAILABLE:
                     try:
                         wordcloud_text = ' '.join([
                             f"{row['keyword']} " * max(1, min(5, int(row['frequency'])))
-                            for _, row in keywords_data.iterrows() 
+                            for _, row in display_keywords_data.head(50).iterrows() 
                             if pd.notna(row['keyword']) and isinstance(row['keyword'], str) and row['keyword'] != ''
                         ])
                         
@@ -462,7 +520,9 @@ def render_sentiment_dashboard():
                             st.subheader("☁️ Word Cloud")
                             create_safe_wordcloud(wordcloud_text, "Most Mentioned Keywords")
                     except Exception as e:
-                        st.info("Word cloud generation skipped")
+                        st.info(f"Word cloud generation skipped: {str(e)}")
+                else:
+                    st.info("📝 No keywords found for the selected filters.")
                 
             else:
                 st.info("📝 No keywords data available. Keywords will be generated during ETL process.")

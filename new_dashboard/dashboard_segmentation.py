@@ -128,24 +128,101 @@ def render_segmentation_dashboard():
             st.markdown('<div class="chart-container">', unsafe_allow_html=True)
             st.subheader("🗺️ Segmentasi Lokasi Berdasarkan Rating")
             
-            # Create segmentation based on rating
-            filtered_data['rating_segment'] = pd.cut(
-                filtered_data['avg_rating'], 
-                bins=[0, 2, 3, 4, 5], 
-                labels=['Low (1-2)', 'Medium (2-3)', 'Good (3-4)', 'Excellent (4-5)']
-            )
+            # Debug: Show data info
+            st.write(f"Debug: Filtered data shape: {filtered_data.shape}")
+            st.write(f"Debug: Rating range: {filtered_data['avg_rating'].min():.2f} to {filtered_data['avg_rating'].max():.2f}")
             
-            segment_counts = filtered_data['rating_segment'].value_counts()
+            # Create segmentation based on rating - with better handling
+            filtered_data_clean = filtered_data.dropna(subset=['avg_rating']).copy()
             
-            fig = px.treemap(
-                values=segment_counts.values,
-                names=segment_counts.index,
-                title="Rating Segmentation",
-                color=segment_counts.values,
-                color_continuous_scale='RdYlGn'
-            )
-            fig.update_layout(height=400)
-            st.plotly_chart(fig, use_container_width=True)
+            if not filtered_data_clean.empty and len(filtered_data_clean) > 0:
+                # Use simpler binning approach
+                def categorize_rating(rating):
+                    if rating <= 2.0:
+                        return 'Low (0-2)'
+                    elif rating <= 3.0:
+                        return 'Medium (2-3)'
+                    elif rating <= 4.0:
+                        return 'Good (3-4)'
+                    else:
+                        return 'Excellent (4-5)'
+                
+                # Apply categorization
+                filtered_data_clean['rating_segment'] = filtered_data_clean['avg_rating'].apply(categorize_rating)
+                
+                # Count segments
+                segment_counts = filtered_data_clean['rating_segment'].value_counts()
+                
+                st.write(f"Debug: Segment counts: {segment_counts}")
+                
+                if len(segment_counts) > 0:
+                    # Create DataFrame for treemap
+                    treemap_data = pd.DataFrame({
+                        'segment': segment_counts.index,
+                        'count': segment_counts.values,
+                        'percentage': (segment_counts.values / segment_counts.sum() * 100).round(1)
+                    })
+                    
+                    # Try different treemap approaches
+                    try:
+                        # Method 1: Using px.treemap with DataFrame
+                        fig = px.treemap(
+                            treemap_data,
+                            path=['segment'],
+                            values='count',
+                            title="Rating Segmentation Distribution",
+                            color='count',
+                            color_continuous_scale='RdYlGn',
+                            hover_data={'percentage': True}
+                        )
+                        fig.update_layout(height=400, font_size=12)
+                        fig.update_traces(textinfo="label+value+percent parent")
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                    except Exception as e:
+                        st.error(f"Treemap error: {e}")
+                        
+                        # Fallback: Use bar chart instead
+                        fig = px.bar(
+                            treemap_data,
+                            x='segment',
+                            y='count',
+                            title="Rating Segmentation Distribution (Bar Chart)",
+                            color='count',
+                            color_continuous_scale='RdYlGn',
+                            text='count'
+                        )
+                        fig.update_layout(height=400)
+                        fig.update_traces(texttemplate='%{text}', textposition='outside')
+                        st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Show segment breakdown as table
+                    st.markdown("**Segment Breakdown:**")
+                    for _, row in treemap_data.iterrows():
+                        st.markdown(f"- **{row['segment']}**: {row['count']} locations ({row['percentage']:.1f}%)")
+                        
+                else:
+                    st.info("No rating segments available - all ratings may be in same range")
+                    
+                    # Show alternative visualization - histogram
+                    fig = px.histogram(
+                        filtered_data_clean,
+                        x='avg_rating',
+                        nbins=10,
+                        title="Rating Distribution Histogram",
+                        labels={'avg_rating': 'Average Rating', 'count': 'Number of Locations'}
+                    )
+                    fig.update_layout(height=400)
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+            else:
+                st.info("No rating data available for segmentation")
+                
+                # Show sample data if available
+                if not filtered_data.empty:
+                    st.write("Sample data:")
+                    st.dataframe(filtered_data[['city', 'avg_rating']].head())
+                
             st.markdown('</div>', unsafe_allow_html=True)
         
         # Restaurant performance clustering
