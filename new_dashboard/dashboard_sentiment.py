@@ -122,7 +122,7 @@ def render_sentiment_dashboard():
                     title="Sentiment Distribution",
                     color_discrete_map={
                         'positive': '#2E8B57',
-                        'negative': '#DC143C',
+                        'negative': "#200B0F",
                         'neutral': '#4682B4'
                     }
                 )
