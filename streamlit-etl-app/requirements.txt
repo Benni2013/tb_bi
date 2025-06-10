@@ -1,7 +1,7 @@
 streamlit
 pandas
 sqlalchemy
-psycopg2
+psycopg2-binary
 nltk
 textblob
-# streamlit-option-menu
+streamlit-option-menu
