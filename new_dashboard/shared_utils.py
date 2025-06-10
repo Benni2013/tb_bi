@@ -22,7 +22,7 @@ DB_CONFIG = {
     'host': 'localhost',
     'database': 'dw_bi',
     'user': 'postgres',
-    'password': 'postgres',
+    'password': 'wedieyoung',
     'port': '5432'
 }
 
