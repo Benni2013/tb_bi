@@ -21,142 +21,6 @@ except:
 
 from database_config import DB_CONFIG
 
-# Tambahkan library untuk fuzzy matching
-from difflib import SequenceMatcher
-
-def normalize_restaurant_name(name):
-    """
-    Normalize restaurant names to group similar variants together
-    """
-    if pd.isna(name) or str(name).strip() == '':
-        return 'Unknown'
-    
-    # Convert to string and strip whitespace
-    name = str(name).strip()
-    
-    # Remove common business suffixes
-    business_suffixes = [
-        'LLC', 'Inc', 'Corp', 'Co', 'LLP', 'Ltd', 'Partnership', 'DBA', 
-        'PC', 'Sole Proprietorship'
-    ]
-    
-    for suffix in business_suffixes:
-        # Remove suffix with comma or without
-        name = re.sub(rf',?\s*{re.escape(suffix)}$', '', name, flags=re.IGNORECASE)
-    
-    # Clean the name
-    name = re.sub(r'[^\w\s&\'-]', ' ', name)  # Keep alphanumeric, spaces, &, ', -
-    name = re.sub(r'\s+', ' ', name)  # Multiple spaces to single space
-    name = name.strip()
-    
-    # Common restaurant name mappings
-    name_mappings = {
-        # Pizza chains
-        r'domino.*pizza.*|domino.*': 'Domino\'s Pizza',
-        r'papa\s*john.*pizza.*|papa\s*john.*': 'Papa John\'s Pizza',
-        r'pizza\s*hut.*': 'Pizza Hut',
-        r'marco.*pizza.*|marco.*': 'Marco\'s Pizza',
-        r'papa\s*murphy.*': 'Papa Murphy\'s',
-        r'little\s*caesar.*': 'Little Caesars Pizza',
-        r'godfather.*pizza.*|godfather.*': 'Godfather\'s Pizza',
-        r'hungry\s*howie.*': 'Hungry Howie\'s Pizza',
-        
-        # Fast food chains
-        r'mcdonald.*': 'McDonald\'s',
-        r'burger\s*king.*': 'Burger King',
-        r'subway.*': 'Subway',
-        r'kfc.*|kentucky\s*fried\s*chicken.*': 'KFC',
-        r'taco\s*bell.*': 'Taco Bell',
-        r'arby.*': 'Arby\'s',
-        r'wendy.*': 'Wendy\'s',
-        r'popeye.*': 'Popeyes Louisiana Kitchen',
-        r'church.*chicken.*': 'Church\'s Chicken',
-        
-        # Asian restaurants
-        r'panda\s*express.*': 'Panda Express',
-        r'panda\s*garden.*|panda\s*palace.*': 'Panda Garden',
-        r'china\s*garden.*|china\s*palace.*|china\s*cafe.*|china\s*dragon.*|china\s*chef.*|china\s*delight.*|china\s*sea.*|china\s*town.*|new\s*china.*': 'China Garden',
-        r'golden\s*china.*': 'Golden China Restaurant',
-        r'great\s*china.*': 'Great China',
-        r'hunan\s*express.*|hunan\s*garden.*': 'Hunan Garden',
-        r'mandarin\s*house.*|mandarin\s*express.*': 'Mandarin House',
-        
-        # Coffee & sandwich shops
-        r'panera\s*bread.*': 'Panera Bread',
-        r'jimmy\s*john.*': 'Jimmy John\'s',
-        r'firehouse\s*sub.*': 'Firehouse Subs',
-        r'jersey\s*mike.*': 'Jersey Mike\'s Subs',
-        r'starbucks.*': 'Starbucks',
-        
-        # Wings
-        r'buffalo\s*wild\s*wing.*': 'Buffalo Wild Wings',
-        r'zaxby.*': 'Zaxby\'s Chicken Fingers & Buffalo Wings',
-        r'wingstop.*': 'Wingstop',
-        
-        # Casual dining
-        r'olive\s*garden.*': 'Olive Garden Italian Restaurant',
-        r'applebee.*': 'Applebee\'s',
-        r'chili.*': 'Chili\'s',
-        r'hooter.*': 'Hooters',
-        r'tgi\s*friday.*|t\.?g\.?i\.?\s*friday.*': 'TGI Friday\'s',
-        
-        # Others
-        r'tropical\s*smoothie.*': 'Tropical Smoothie Cafe',
-        r'chicken\s*salad\s*chick.*': 'Chicken Salad Chick',
-        r'newk.*eatery.*|newk.*': 'Newk\'s Eatery',
-        r'mcalister.*deli.*|mcalister.*': 'McAlister\'s Deli',
-        r'mellow\s*mushroom.*': 'Mellow Mushroom',
-        r'jason.*deli.*': 'Jason\'s Deli',
-        r'cicis.*|cici.*pizza.*': 'Cicis',
-        r'which\s*wich.*': 'Which Wich'
-    }
-    
-    # Apply mappings
-    name_lower = name.lower()
-    for pattern, standard_name in name_mappings.items():
-        if re.search(pattern, name_lower):
-            return standard_name
-    
-    # If no mapping found, return cleaned name with proper capitalization
-    return name.title()
-
-def find_similar_names(names, threshold=0.8):
-    """
-    Find groups of similar restaurant names using fuzzy matching
-    """
-    groups = []
-    processed = set()
-    
-    for i, name1 in enumerate(names):
-        if name1 in processed:
-            continue
-            
-        group = [name1]
-        processed.add(name1)
-        
-        for j, name2 in enumerate(names[i+1:], i+1):
-            if name2 in processed:
-                continue
-                
-            # Calculate similarity
-            similarity = SequenceMatcher(None, name1.lower(), name2.lower()).ratio()
-            
-            # Also check if one name is contained in another (for cases like "Pizza Hut" vs "Pizza Hut Co")
-            name1_clean = re.sub(r'\s+', ' ', name1.lower().strip())
-            name2_clean = re.sub(r'\s+', ' ', name2.lower().strip())
-            
-            contains_match = (name1_clean in name2_clean or name2_clean in name1_clean) and \
-                           abs(len(name1_clean) - len(name2_clean)) < 10
-            
-            if similarity >= threshold or contains_match:
-                group.append(name2)
-                processed.add(name2)
-        
-        if len(group) > 1:
-            groups.append(group)
-    
-    return groups
-
 def create_engine_connection():
     engine = create_engine(f"postgresql://postgres.cwbeoriyhbsamwvhkuna:dw_dashboard_bi@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres")
     return engine
@@ -288,42 +152,7 @@ def etl_dim_restaurant(df, engine, retain_data=False):
     df_copy['Phone'] = df_copy['Phone'].fillna('-').astype(str)
     df_copy['OLF'] = df_copy['OLF'].fillna('-').astype(str)
     
-    # Step 1: Apply initial normalization
-    print("📝 Normalizing restaurant names...")
-    df_copy['Organization_Normalized'] = df_copy['Organization'].apply(normalize_restaurant_name)
-    
-    # Step 2: Get unique normalized names and find similar groups
-    unique_names = df_copy['Organization_Normalized'].unique()
-    print(f"📊 Found {len(unique_names)} unique normalized names")
-    
-    # Step 3: Find similar name groups for remaining names
-    print("🔍 Finding similar restaurant name groups...")
-    similar_groups = find_similar_names(unique_names, threshold=0.85)
-    
-    # Step 4: Create final mapping
-    final_mapping = {}
-    
-    # Add individual mappings first
-    for name in unique_names:
-        final_mapping[name] = name
-    
-    # Override with group mappings (use the shortest name as the standard)
-    for group in similar_groups:
-        # Choose the most common/standard name (shortest clean name usually)
-        standard_name = min(group, key=len)
-        print(f"🔗 Grouping: {group} -> {standard_name}")
-        
-        for name in group:
-            final_mapping[name] = standard_name
-    
-    # Step 5: Apply final mapping
-    df_copy['Organization_Final'] = df_copy['Organization_Normalized'].map(final_mapping)
-    
-    # Step 6: Create restaurant dimension data
-    restaurant_data = df_copy.groupby('Organization_Final').agg({
-        'Phone': 'first',  # Take first phone number
-        'OLF': 'first'     # Take first OLF
-    }).reset_index()
+    restaurant_data = df_copy[restaurant_cols].drop_duplicates().reset_index(drop=True)
     
     restaurants = []
     restaurant_key = 1
@@ -331,28 +160,13 @@ def etl_dim_restaurant(df, engine, retain_data=False):
     for _, row in restaurant_data.iterrows():
         restaurants.append({
             'restaurant_key': restaurant_key,
-            'organization_name': str(row['Organization_Final']) if pd.notna(row['Organization_Final']) and str(row['Organization_Final']) != 'nan' else 'Unknown',
+            'organization_name': str(row['Organization']) if pd.notna(row['Organization']) and str(row['Organization']) != 'nan' else 'Unknown',
             'phone_number': str(row['Phone']) if pd.notna(row['Phone']) and str(row['Phone']) != 'nan' else '-',
             'oil_info': str(row['OLF']) if pd.notna(row['OLF']) and str(row['OLF']) != 'nan' else '-'
         })
         restaurant_key += 1
     
     dim_restaurant_df = pd.DataFrame(restaurants)
-    
-    # Step 7: Show summary of normalization
-    original_count = df_copy['Organization'].nunique()
-    final_count = len(dim_restaurant_df)
-    print(f"📈 Restaurant normalization summary:")
-    print(f"   Original unique restaurants: {original_count}")
-    print(f"   Final unique restaurants: {final_count}")
-    print(f"   Reduction: {original_count - final_count} duplicates merged")
-    
-    # Show some examples of merged restaurants
-    if similar_groups:
-        print(f"🔗 Examples of merged restaurants:")
-        for i, group in enumerate(similar_groups[:5]):  # Show first 5 groups
-            standard_name = min(group, key=len)
-            print(f"   Group {i+1}: {group} -> '{standard_name}'")
     
     if not dim_restaurant_df.empty:
         dim_restaurant_df.to_sql('dim_restaurant', engine, if_exists='append', index=False)
