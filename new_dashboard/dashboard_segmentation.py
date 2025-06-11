@@ -100,7 +100,7 @@ def render_segmentation_dashboard():
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+            st.markdown('<hr style="border: 1px solid white; margin: 20px 0;">', unsafe_allow_html=True)
             st.subheader("📈 Performa Lokasi Berdasarkan Rating")
             
             location_perf = filtered_data.groupby(['city', 'state']).agg({
@@ -125,12 +125,8 @@ def render_segmentation_dashboard():
             st.markdown('</div>', unsafe_allow_html=True)
         
         with col2:
-            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+            st.markdown('<hr style="border: 1px solid white; margin: 20px 0;">', unsafe_allow_html=True)
             st.subheader("🗺️ Segmentasi Lokasi Berdasarkan Rating")
-            
-            # Debug: Show data info
-            st.write(f"Debug: Filtered data shape: {filtered_data.shape}")
-            st.write(f"Debug: Rating range: {filtered_data['avg_rating'].min():.2f} to {filtered_data['avg_rating'].max():.2f}")
             
             # Create segmentation based on rating - with better handling
             filtered_data_clean = filtered_data.dropna(subset=['avg_rating']).copy()
@@ -152,8 +148,6 @@ def render_segmentation_dashboard():
                 
                 # Count segments
                 segment_counts = filtered_data_clean['rating_segment'].value_counts()
-                
-                st.write(f"Debug: Segment counts: {segment_counts}")
                 
                 if len(segment_counts) > 0:
                     # Create DataFrame for treemap
@@ -195,10 +189,6 @@ def render_segmentation_dashboard():
                         fig.update_layout(height=400)
                         fig.update_traces(texttemplate='%{text}', textposition='outside')
                         st.plotly_chart(fig, use_container_width=True)
-                    
-                    # Show segment breakdown as table
-                    st.markdown("**Segment Breakdown:**")
-                    for _, row in treemap_data.iterrows():
                         st.markdown(f"- **{row['segment']}**: {row['count']} locations ({row['percentage']:.1f}%)")
                         
                 else:
@@ -226,7 +216,7 @@ def render_segmentation_dashboard():
             st.markdown('</div>', unsafe_allow_html=True)
         
         # Restaurant performance clustering
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        st.markdown('<hr style="border: 1px solid white; margin: 20px 0;">', unsafe_allow_html=True)
         st.subheader("🎯 Pengelompokan Kinerja Restoran")
         
         restaurant_perf = filtered_data.groupby('organization_name').agg({
@@ -265,7 +255,7 @@ def render_segmentation_dashboard():
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+            st.markdown('<hr style="border: 1px solid white; margin: 20px 0;">', unsafe_allow_html=True)
             st.subheader("🔝 Lokasi dengan Rating Tertinggi")
             if not filtered_data.empty:
                 top_locations = filtered_data.nlargest(5, 'avg_rating')[['city', 'state', 'avg_rating', 'total_reviews']]
@@ -276,7 +266,7 @@ def render_segmentation_dashboard():
             st.markdown('</div>', unsafe_allow_html=True)
         
         with col2:
-            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+            st.markdown('<hr style="border: 1px solid white; margin: 20px 0;">', unsafe_allow_html=True)
             st.subheader("📉 Lokasi dengan Rating Terendah")
             if not filtered_data.empty:
                 bottom_locations = filtered_data.nsmallest(5, 'avg_rating')[['city', 'state', 'avg_rating', 'total_reviews']]
