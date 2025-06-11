@@ -2,6 +2,7 @@ streamlit
 pandas
 sqlalchemy
 psycopg2-binary
-nltk
-textblob
-streamlit-option-menu
+plotly
+wordcloud
+matplotlib
+numpy

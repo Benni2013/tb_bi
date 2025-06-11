@@ -117,7 +117,7 @@ def load_css():
         }
         .metric-card {
             background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            padding: 1rem;
+            padding: 0.5rem;
             border-radius: 10px;
             color: white;
             text-align: center;
