@@ -85,7 +85,8 @@ def render_segmentation_dashboard():
             )
         
         with col3:
-            total_restaurants = filtered_data['organization_name'].nunique()
+            # Hitung total restoran unik berdasarkan kombinasi organisasi & kota
+            total_restaurants = filtered_data.drop_duplicates(subset=['organization_name', 'city']).shape[0]
             st.markdown(
                 f"""
                 <div class="metric-card">
