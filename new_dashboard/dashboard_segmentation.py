@@ -216,6 +216,31 @@ def render_segmentation_dashboard():
                 
             st.markdown('</div>', unsafe_allow_html=True)
         
+        # Top Organizations Trend
+        st.markdown('<hr style="border: 1px solid white; margin: 20px 0;">', unsafe_allow_html=True)
+        st.subheader("📈 Top Organizations Rating Evolution")
+        
+        top_orgs = filtered_data.groupby('organization_name')['total_reviews'].sum().nlargest(5).index
+        trend_data = filtered_data[filtered_data['organization_name'].isin(top_orgs)]
+        
+        monthly_org_trend = trend_data.groupby(['organization_name', 'year', 'month']).agg({
+            'avg_rating': 'mean'
+        }).reset_index()
+        monthly_org_trend['date'] = pd.to_datetime(monthly_org_trend[['year', 'month']].assign(day=1))
+        
+        fig = px.line(
+            monthly_org_trend,
+            x='date',
+            y='avg_rating',
+            color='organization_name',
+            title="Rating Evolution for Market Leaders",
+            labels={'date': 'Date', 'avg_rating': 'Average Rating'},
+            markers=True
+        )
+        fig.update_layout(height=500)
+        st.plotly_chart(fig, use_container_width=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+    
         # Performance insights
         col1, col2 = st.columns(2)
         
@@ -244,27 +269,3 @@ def render_segmentation_dashboard():
     else:
         st.warning("⚠️ No data available for segmentation analysis")
         
-    # Top Organizations Trend
-    st.markdown('<hr style="border: 1px solid white; margin: 20px 0;">', unsafe_allow_html=True)
-    st.subheader("📈 Top Organizations Rating Evolution")
-    
-    top_orgs = filtered_data.groupby('organization_name')['total_reviews'].sum().nlargest(5).index
-    trend_data = filtered_data[filtered_data['organization_name'].isin(top_orgs)]
-    
-    monthly_org_trend = trend_data.groupby(['organization_name', 'year', 'month']).agg({
-        'avg_rating': 'mean'
-    }).reset_index()
-    monthly_org_trend['date'] = pd.to_datetime(monthly_org_trend[['year', 'month']].assign(day=1))
-    
-    fig = px.line(
-        monthly_org_trend,
-        x='date',
-        y='avg_rating',
-        color='organization_name',
-        title="Rating Evolution for Market Leaders",
-        labels={'date': 'Date', 'avg_rating': 'Average Rating'},
-        markers=True
-    )
-    fig.update_layout(height=500)
-    st.plotly_chart(fig, use_container_width=True)
-    st.markdown('</div>', unsafe_allow_html=True)
