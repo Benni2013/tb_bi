@@ -57,13 +57,13 @@ def render_sentiment_dashboard():
         
         with col1:
             positive_count = sentiment_counts.get('positive', 0)
-            positive_pct = (positive_count / total_reviews * 100) if total_reviews > 0 else 0
+            # positive_pct = (positive_count / total_reviews * 100) if total_reviews > 0 else 0
             st.markdown(
                 f"""
                 <div class="metric-card">
                     <h4>😊 Positive</h4>
                     <h2>{positive_count}</h2>
-                    <p>{positive_pct:.1f}%</p>
+                    
                 </div>
                 """, 
                 unsafe_allow_html=True
@@ -71,13 +71,13 @@ def render_sentiment_dashboard():
         
         with col2:
             negative_count = sentiment_counts.get('negative', 0)
-            negative_pct = (negative_count / total_reviews * 100) if total_reviews > 0 else 0
+            # negative_pct = (negative_count / total_reviews * 100) if total_reviews > 0 else 0
             st.markdown(
                 f"""
                 <div class="metric-card">
                     <h4>😞 Negative</h4>
                     <h2>{negative_count}</h2>
-                    <p>{negative_pct:.1f}%</p>
+                    
                 </div>
                 """, 
                 unsafe_allow_html=True
@@ -85,13 +85,13 @@ def render_sentiment_dashboard():
         
         with col3:
             neutral_count = sentiment_counts.get('neutral', 0)
-            neutral_pct = (neutral_count / total_reviews * 100) if total_reviews > 0 else 0
+            # neutral_pct = (neutral_count / total_reviews * 100) if total_reviews > 0 else 0
             st.markdown(
                 f"""
                 <div class="metric-card">
                     <h4>😐 Neutral</h4>
                     <h2>{neutral_count}</h2>
-                    <p>{neutral_pct:.1f}%</p>
+                    
                 </div>
                 """, 
                 unsafe_allow_html=True
