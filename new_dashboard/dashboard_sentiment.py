@@ -250,7 +250,7 @@ def render_sentiment_dashboard():
                 JOIN dim_location dl ON frr.location_key = dl.location_key
                 JOIN dim_time dt ON frr.time_key = dt.time_key
                 WHERE ds.sentiment_label IS NOT NULL
-                -- LIMIT 500
+                LIMIT 500
                 """
                 return load_data(query)
             except Exception as e:
