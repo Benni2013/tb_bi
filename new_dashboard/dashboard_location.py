@@ -362,7 +362,7 @@ def render_location_dashboard():
         col1, col2 = st.columns(2)
         
         with col1:
-            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+            st.markdown('<hr style="border: 1px solid white; margin: 20px 0;">', unsafe_allow_html=True)
             st.subheader("📊 Performance Matrix: Rating vs Volume")
             
             location_perf = filtered_data.groupby('city').agg({
@@ -415,7 +415,7 @@ def render_location_dashboard():
         
         with col2:
             # REPLACED: Review Volume Trend with Rating Map per State
-            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+            st.markdown('<hr style="border: 1px solid white; margin: 20px 0;">', unsafe_allow_html=True)
             st.subheader("🗺️ Rating Peta Per State")
             
             # Prepare data for the map
@@ -496,7 +496,7 @@ def render_location_dashboard():
             st.markdown('</div>', unsafe_allow_html=True)
         
         # Rating Trend Analysis
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+        st.markdown('<hr style="border: 1px solid white; margin: 20px 0;">', unsafe_allow_html=True)
         st.subheader("📈 Rating Trend Analysis with Benchmarks")
         
         monthly_trend = filtered_data.groupby(['year', 'month']).agg({
@@ -554,35 +554,110 @@ def render_location_dashboard():
         
         # Competitive Analysis (only show if multiple orgs selected)
         if len(selected_orgs) > 1:
-            st.markdown('<div class="chart-container">', unsafe_allow_html=True)
+            st.markdown('<hr style="border: 1px solid white; margin: 20px 0;">', unsafe_allow_html=True)
             st.subheader("🏆 Competitive Landscape Analysis")
-            
+                    
             org_performance = filtered_data.groupby('organization_name').agg({
                 'avg_rating': 'mean',
                 'total_reviews': 'sum',
                 'city': 'nunique'
             }).reset_index().rename(columns={'city': 'locations_count'})
             
-            # Sort by performance score (weighted rating and volume)
-            org_performance['performance_score'] = (
-                org_performance['avg_rating'] * 0.7 + 
-                (org_performance['total_reviews'] / org_performance['total_reviews'].max()) * 0.3
-            )
-            org_performance = org_performance.sort_values('performance_score', ascending=True)
+            # Sort by total reviews untuk menampilkan yang paling aktif di atas
+            org_performance = org_performance.sort_values('total_reviews', ascending=True)
             
+            # Create the horizontal bar chart with total_reviews on x-axis and colored by avg_rating
             fig = px.bar(
-                org_performance.tail(10),
-                x='performance_score',
+                org_performance.tail(15),  # Show top 15 organizations by review volume
+                x='total_reviews',  # X-axis: Total Reviews
                 y='organization_name',
                 orientation='h',
-                title="Top 10 Organizations by Performance Score",
-                labels={'performance_score': 'Performance Score (Rating + Volume)', 'organization_name': 'Brand'},
-                color='avg_rating',
-                color_continuous_scale='RdYlGn',
-                hover_data=['avg_rating', 'total_reviews', 'locations_count']
+                title="Top Organizations by Review Volume (Colored by Average Rating)",
+                labels={
+                    'total_reviews': 'Total Reviews', 
+                    'organization_name': 'Organization',
+                    'avg_rating': 'Average Rating'
+                },
+                color='avg_rating',  # Color by average rating
+                color_continuous_scale='RdYlGn',  # Red (low) to Yellow to Green (high)
+                hover_data={
+                    'avg_rating': ':.2f',
+                    'total_reviews': ':,',
+                    'locations_count': True
+                },
+                text='total_reviews'  # Show review numbers on bars
             )
-            fig.update_layout(height=500)
+            
+            # Customize the chart
+            fig.update_traces(
+                texttemplate='%{text:,}',  # Format numbers with commas
+                textposition='outside'     # Place text outside bars
+            )
+            
+            # Update layout for better readability
+            fig.update_layout(
+                height=500,
+                xaxis_title="Total Number of Reviews",
+                yaxis_title="Organization",
+                coloraxis_colorbar=dict(
+                    title="Average Rating",
+                    title_side="right"
+                ),
+                margin=dict(l=200),  # More left margin for org names
+                font=dict(size=12)
+            )
+            
+            # Add range indicator for colorbar
+            fig.update_coloraxes(
+                colorbar_title_text="Average Rating ⭐",
+                cmin=org_performance['avg_rating'].min(),
+                cmax=org_performance['avg_rating'].max()
+            )
+            
             st.plotly_chart(fig, use_container_width=True)
+            
+            # Add summary insights below the chart
+            col1, col2, col3 = st.columns(3)
+            
+            with col1:
+                # Most active organization
+                most_active = org_performance.loc[org_performance['total_reviews'].idxmax()]
+                st.success(f"""
+                **📊 Most Active:**
+                - **{most_active['organization_name']}**
+                - {most_active['total_reviews']:,} reviews
+                - ⭐ {most_active['avg_rating']:.2f} avg rating
+                """)
+            
+            with col2:
+                # Highest rated organization (among those with significant reviews)
+                # Filter to orgs with at least 10% of max reviews to avoid outliers
+                min_reviews_threshold = org_performance['total_reviews'].max() * 0.1
+                qualified_orgs = org_performance[org_performance['total_reviews'] >= min_reviews_threshold]
+                
+                if not qualified_orgs.empty:
+                    highest_rated = qualified_orgs.loc[qualified_orgs['avg_rating'].idxmax()]
+                    st.info(f"""
+                    **⭐ Highest Quality:**
+                    - **{highest_rated['organization_name']}**
+                    - ⭐ {highest_rated['avg_rating']:.2f} avg rating
+                    - {highest_rated['total_reviews']:,} reviews
+                    """)
+            
+            with col3:
+                # Best overall performance (balanced rating and volume)
+                org_performance['balanced_score'] = (
+                    org_performance['avg_rating'] * 0.6 + 
+                    (org_performance['total_reviews'] / org_performance['total_reviews'].max()) * 5 * 0.4
+                )
+                best_overall = org_performance.loc[org_performance['balanced_score'].idxmax()]
+                st.warning(f"""
+                **🏆 Best Overall:**
+                - **{best_overall['organization_name']}**
+                - ⭐ {best_overall['avg_rating']:.2f} rating
+                - {best_overall['total_reviews']:,} reviews
+                """)
+            
             st.markdown('</div>', unsafe_allow_html=True)
         
         
