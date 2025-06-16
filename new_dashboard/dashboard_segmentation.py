@@ -144,7 +144,7 @@ def render_segmentation_dashboard():
                     else:
                         return 'Excellent (4-5)'
                 
-                # Apply categorization
+                # Apply categorization 
                 filtered_data_clean['rating_segment'] = filtered_data_clean['avg_rating'].apply(categorize_rating)
                 
                 # Count segments
