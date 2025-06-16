@@ -5,6 +5,10 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from shared_utils import load_data, load_css
 from datetime import datetime, date
+import folium
+from streamlit_folium import folium_static
+import json
+import requests
 
 def render_location_dashboard():
     load_css()
@@ -264,7 +268,7 @@ def render_location_dashboard():
             st.markdown(
                 f"""
                 <div class="metric-card">
-                    <h4>🏪 Total Restaurants</h4>
+                    <h4>🏪 Total Brands</h4>
                     <h2>{filtered_data['organization_name'].nunique()}</h2>
                     <p>Brands Analyzed</p>
                 </div>
@@ -328,6 +332,31 @@ def render_location_dashboard():
             st.info("📢 **High Activity Locations**")
             for _, city in high_volume.iterrows():
                 st.write(f"• **{city['city']}**: {city['total_reviews']:,} reviews")
+                
+        # SEASONAL ANALYSIS - untuk Tim Pemasaran
+        st.markdown("### 📅 Analisis Seasonal untuk Strategi Pemasaran")
+        seasonal_data = filtered_data.copy()
+        seasonal_data['quarter'] = seasonal_data['date'].dt.quarter
+        seasonal_data['season'] = seasonal_data['quarter'].map({
+            1: 'Winter (Q1)', 2: 'Spring (Q2)', 
+            3: 'Summer (Q3)', 4: 'Fall (Q4)'
+        })
+
+        seasonal_performance = seasonal_data.groupby('season').agg({
+            'avg_rating': 'mean',
+            'total_reviews': 'sum'
+        }).reset_index()
+
+        col1, col2 = st.columns(2)
+        with col1:
+            st.subheader("🌱 Best Season for Marketing")
+            best_season = seasonal_performance.loc[seasonal_performance['avg_rating'].idxmax()]
+            st.success(f"**{best_season['season']}** - ⭐ {best_season['avg_rating']:.2f}")
+
+        with col2:
+            st.subheader("📈 Most Active Season")
+            active_season = seasonal_performance.loc[seasonal_performance['total_reviews'].idxmax()]
+            st.info(f"**{active_season['season']}** - 📝 {active_season['total_reviews']:,} reviews")
         
         # ENHANCED VISUALIZATIONS
         col1, col2 = st.columns(2)
@@ -385,27 +414,85 @@ def render_location_dashboard():
             st.markdown('</div>', unsafe_allow_html=True)
         
         with col2:
+            # REPLACED: Review Volume Trend with Rating Map per State
             st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-            st.subheader("📈 Review Volume Trend")
+            st.subheader("🗺️ Rating Peta Per State")
             
-            monthly_reviews = filtered_data.groupby(['year', 'month']).agg({
+            # Prepare data for the map
+            state_performance = filtered_data.groupby('state').agg({
+                'avg_rating': 'mean',
                 'total_reviews': 'sum'
             }).reset_index()
             
-            if not monthly_reviews.empty:
-                monthly_reviews['date'] = pd.to_datetime(monthly_reviews[['year', 'month']].assign(day=1))
-                
-                fig = px.bar(
-                    monthly_reviews,
-                    x='date',
-                    y='total_reviews',
-                    title="Monthly Review Volume",
-                    labels={'date': 'Date', 'total_reviews': 'Number of Reviews'},
-                    color='total_reviews',
-                    color_continuous_scale='Blues'
-                )
-                fig.update_layout(height=400)
-                st.plotly_chart(fig, use_container_width=True)
+            if not state_performance.empty:
+                try:
+                    # Load GeoJSON untuk state di USA
+                    @st.cache_data(ttl=3600)  # Cache for 1 hour
+                    def load_geojson():
+                        url = 'https://raw.githubusercontent.com/python-visualization/folium/master/examples/data/us-states.json'
+                        response = requests.get(url)
+                        return response.json()
+                    
+                    geojson_data = load_geojson()
+                    
+                    # Create the map
+                    m = folium.Map(location=[39.8283, -98.5795], zoom_start=4)
+                    
+                    # Add choropleth layer
+                    folium.Choropleth(
+                        geo_data=geojson_data,
+                        name='choropleth',
+                        data=state_performance,
+                        columns=['state', 'avg_rating'],
+                        key_on='feature.id',  # 'id' pada geojson = kode state (CA, NY, dll)
+                        fill_color='YlOrRd',
+                        fill_opacity=0.7,
+                        line_opacity=0.2,
+                        legend_name='Average Rating per State',
+                        nan_fill_color='lightgray'
+                    ).add_to(m)
+                    
+                    # Add markers for better interactivity
+                    for _, row in state_performance.iterrows():
+                        # Get state center coordinates (simplified mapping)
+                        state_coords = get_state_coordinates(row['state'])
+                        if state_coords:
+                            folium.CircleMarker(
+                                location=state_coords,
+                                radius=min(max(row['avg_rating'] * 2, 3), 15),
+                                popup=f"""
+                                <b>{state_mapping.get(row['state'], row['state'])}</b><br>
+                                Rating: {row['avg_rating']:.2f}<br>
+                                Reviews: {row['total_reviews']:,}
+                                """,
+                                color='darkred',
+                                fill=True,
+                                fillColor='red',
+                                fillOpacity=0.6
+                            ).add_to(m)
+                    
+                    # Display the map
+                    folium_static(m, width=600, height=400)
+                    
+                    
+                except Exception as e:
+                    st.error(f"❌ Error loading map: {str(e)}")
+                    # Fallback to bar chart
+                    fig = px.bar(
+                        state_performance.sort_values('avg_rating', ascending=True).tail(10),
+                        x='avg_rating',
+                        y='state',
+                        orientation='h',
+                        title="Top 10 States by Average Rating",
+                        labels={'avg_rating': 'Average Rating', 'state': 'State'},
+                        color='avg_rating',
+                        color_continuous_scale='YlOrRd'
+                    )
+                    fig.update_layout(height=400)
+                    st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("📍 No state-level data available for mapping")
+            
             st.markdown('</div>', unsafe_allow_html=True)
         
         # Rating Trend Analysis
@@ -498,56 +585,57 @@ def render_location_dashboard():
             st.plotly_chart(fig, use_container_width=True)
             st.markdown('</div>', unsafe_allow_html=True)
         
-        # Top Organizations Trend
-        st.markdown('<div class="chart-container">', unsafe_allow_html=True)
-        st.subheader("📈 Top Organizations Rating Evolution")
         
-        top_orgs = filtered_data.groupby('organization_name')['total_reviews'].sum().nlargest(5).index
-        trend_data = filtered_data[filtered_data['organization_name'].isin(top_orgs)]
-        
-        monthly_org_trend = trend_data.groupby(['organization_name', 'year', 'month']).agg({
-            'avg_rating': 'mean'
-        }).reset_index()
-        monthly_org_trend['date'] = pd.to_datetime(monthly_org_trend[['year', 'month']].assign(day=1))
-        
-        fig = px.line(
-            monthly_org_trend,
-            x='date',
-            y='avg_rating',
-            color='organization_name',
-            title="Rating Evolution for Market Leaders",
-            labels={'date': 'Date', 'avg_rating': 'Average Rating'},
-            markers=True
-        )
-        fig.update_layout(height=500)
-        st.plotly_chart(fig, use_container_width=True)
-        st.markdown('</div>', unsafe_allow_html=True)
         
         # Action Items Section
-        st.markdown("### 🎯 Recommended Actions")
+        # st.markdown("### 🎯 Recommended Actions")
         
-        col1, col2 = st.columns(2)
+        # col1, col2 = st.columns(2)
         
-        with col1:
-            st.markdown("""
-            **🔴 Diperlukan Tindakan Segera:**
-            - Meninjau operasi di lokasi yang berkinerja buruk
-            - Menerapkan program pelatihan layanan pelanggan
-            - Menangani keluhan khusus di area dengan peringkat rendah
-            - Mempertimbangkan audit operasional untuk lokasi-lokasi yang bermasalah
-            """)
+        # with col1:
+        #     st.markdown("""
+        #     **🔴 Diperlukan Tindakan Segera:**
+        #     - Meninjau operasi di lokasi yang berkinerja buruk
+        #     - Menerapkan program pelatihan layanan pelanggan
+        #     - Menangani keluhan khusus di area dengan peringkat rendah
+        #     - Mempertimbangkan audit operasional untuk lokasi-lokasi yang bermasalah
+        #     """)
         
-        with col2:
-            st.markdown("""
-            **🟢 Peluang Pertumbuhan:**
-            - Meniru praktik terbaik dari para pemain terbaik
-            - Meningkatkan pemasaran di area dengan peringkat tinggi dan volume rendah
-            - Memperluas model lokasi yang berhasil
-            - Memantau strategi pesaing di pasar-pasar utama
-            """)
+        # with col2:
+        #     st.markdown("""
+        #     **🟢 Peluang Pertumbuhan:**
+        #     - Meniru praktik terbaik dari para pemain terbaik
+        #     - Meningkatkan pemasaran di area dengan peringkat tinggi dan volume rendah
+        #     - Memperluas model lokasi yang berhasil
+        #     - Memantau strategi pesaing di pasar-pasar utama
+        #     """)
         
     else:
         st.warning("⚠️ No data available for location performance analysis")
+
+def get_state_coordinates(state_code):
+    """Get approximate center coordinates for US states"""
+    # Simplified state coordinates mapping
+    coordinates = {
+        'AL': [32.806671, -86.791130], 'AK': [61.370716, -152.404419], 'AZ': [33.729759, -111.431221],
+        'AR': [34.969704, -92.373123], 'CA': [36.116203, -119.681564], 'CO': [39.059811, -105.311104],
+        'CT': [41.767, -72.677], 'DE': [39.161921, -75.526755], 'FL': [27.766279, -81.686783],
+        'GA': [33.76, -84.39], 'HI': [21.30895, -157.826182], 'ID': [44.240459, -114.478828],
+        'IL': [40.349457, -88.986137], 'IN': [39.790942, -86.147685], 'IA': [42.011539, -93.210526],
+        'KS': [38.526600, -96.726486], 'KY': [37.66814, -84.86311], 'LA': [31.169546, -91.867805],
+        'ME': [44.323535, -69.765261], 'MD': [39.063946, -76.802101], 'MA': [42.230171, -71.530106],
+        'MI': [43.326618, -84.536095], 'MN': [45.694454, -93.900192], 'MS': [32.320, -90.207],
+        'MO': [38.572954, -92.189283], 'MT': [47.052952, -109.633040], 'NE': [41.12537, -98.268082],
+        'NV': [37.839333, -116.46048], 'NH': [43.452492, -71.563896], 'NJ': [40.221741, -74.756138],
+        'NM': [34.97273, -105.032363], 'NY': [42.659829, -75.615], 'NC': [35.771, -78.638],
+        'ND': [47.555049, -101.002012], 'OH': [40.269789, -82.799043], 'OK': [35.482309, -97.534994],
+        'OR': [44.931109, -123.029159], 'PA': [40.269789, -76.875613], 'RI': [41.82355, -71.422132],
+        'SC': [33.836082, -81.163727], 'SD': [44.299782, -99.438828], 'TN': [35.771, -86.25],
+        'TX': [31.106, -97.6475], 'UT': [39.32098, -111.094], 'VT': [44.26639, -72.580536],
+        'VA': [37.54, -78.86], 'WA': [47.042418, -122.893077], 'WV': [38.349497, -81.633294],
+        'WI': [44.268543, -89.616508], 'WY': [42.906847, -107.556081], 'DC': [38.904722, -77.016389]
+    }
+    return coordinates.get(state_code, None)
 
 def calculate_growth_rate(data):
     """Calculate rating growth rate over time"""
