@@ -19,8 +19,6 @@ try:
 except:
     pass
 
-from database_config import DB_CONFIG
-
 def create_engine_connection():
     engine = create_engine(f"postgresql://postgres.cwbeoriyhbsamwvhkuna:dw_dashboard_bi@aws-0-ap-southeast-1.pooler.supabase.com:6543/postgres")
     return engine
